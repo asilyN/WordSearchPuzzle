@@ -9,7 +9,7 @@ from enum import Enum
 from grid import WordGrid
 from ui import UI
 from leaderboard import Leaderboard
-from word_lists import WORD_LISTS
+from word_lists import get_words_by_difficulty, WORD_LISTS
 
 class GameState(Enum):
     START_SCREEN = 1
@@ -151,7 +151,7 @@ class WordSearchGame:
         config = self.level_configs[level]
         
         # Get words for this level
-        word_list = WORD_LISTS[config["word_list"]]
+        word_list = get_words_by_difficulty(config["word_list"])
         
         # Create grid
         self.grid = WordGrid(config["size"], word_list, config["word_count"])
@@ -177,6 +177,9 @@ class WordSearchGame:
             return
         
         # Get the word from selected positions
+        if not self.grid:
+            return
+            
         selected_word = ""
         for pos in selected_positions:
             row, col = pos
