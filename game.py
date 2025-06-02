@@ -1,7 +1,3 @@
-"""
-Main game logic and state management for Word Search Game
-"""
-
 import pygame
 import time
 import json
@@ -300,9 +296,12 @@ class WordSearchGame:
         self.current_level_completion_time_for_display = actual_completion_time # Store for display
 
         level_score = self._calculate_score(actual_completion_time) # Use actual time for score
-        self.level_scores.append(level_score)
+        level_bonus = self.current_level * 500  # Add 500 points per level completed
+        total_level_score = level_score + level_bonus
+        
+        self.level_scores.append(total_level_score)
         self.level_completion_times.append(actual_completion_time) # Store completion time
-        self.total_score += level_score
+        self.total_score += total_level_score
         
         # Leaderboard saving is now handled by _complete_game or when quitting
             
@@ -339,33 +338,24 @@ class WordSearchGame:
         return max(int(base_score - time_penalty), 200)  # Minimum score of 200
     
     def _get_rank(self, avg_time):
-        """Get rank based on average completion time and current level"""
-        # Base time thresholds for each rank
-        base_thresholds = {
-            "S": 30,
-            "A": 60,
-            "B": 90,
-            "C": 120
+        """Get rank based on score"""
+        # Score thresholds for each rank
+        score_thresholds = {
+            "S": 10000, 
+            "A": 8000,   
+            "B": 6000,   
+            "C": 4000,   
+            "D": 200      
         }
         
-        # Adjust thresholds based on level (higher level = stricter time requirements)
-        level_multiplier = 1.0 - (self.current_level - 1) * 0.1  # Each level reduces time by 10%
-        level_multiplier = max(0.5, level_multiplier)  # Minimum multiplier of 0.5
-        
-        # Calculate adjusted thresholds
-        adjusted_thresholds = {
-            rank: threshold * level_multiplier 
-            for rank, threshold in base_thresholds.items()
-        }
-        
-        # Determine rank based on adjusted thresholds
-        if avg_time < adjusted_thresholds["S"]:
+        # Determine rank based on score thresholds
+        if self.total_score >= score_thresholds["S"]:
             return "S"
-        elif avg_time < adjusted_thresholds["A"]:
+        elif self.total_score >= score_thresholds["A"]:
             return "A"
-        elif avg_time < adjusted_thresholds["B"]:
+        elif self.total_score >= score_thresholds["B"]:
             return "B"
-        elif avg_time < adjusted_thresholds["C"]:
+        elif self.total_score >= score_thresholds["C"]:
             return "C"
         else:
             return "D"
@@ -407,7 +397,7 @@ class WordSearchGame:
             score = self.level_scores[-1] if self.level_scores else 0
             self.ui.draw_level_complete(self.current_level, self.current_level_completion_time_for_display, score)
         elif self.state == GameState.GAME_COMPLETE:
-            avg_time = sum(self.level_scores) / len(self.level_scores) if self.level_scores else 0
+            avg_time = sum(self.level_completion_times) / len(self.level_completion_times) if self.level_completion_times else 0
             rank = self._get_rank(avg_time)
             self.ui.draw_game_complete(self.total_score, rank)
         elif self.state == GameState.LEADERBOARD:
