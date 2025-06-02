@@ -3,6 +3,7 @@ Word grid generation and management using Rabin-Karp algorithm
 """
 
 import random
+import time
 from rabin_karp import RabinKarp
 
 class WordGrid:
@@ -14,6 +15,7 @@ class WordGrid:
         self.placed_words = []
         self.word_positions = {}  # Maps word to list of positions
         self.found_positions = set()  # Positions of found words
+        self.incorrect_positions = {}  # Maps positions to their timestamp
         self.rabin_karp = RabinKarp()
         
         # Direction vectors for word placement
@@ -222,3 +224,39 @@ class WordGrid:
     def get_word_list(self):
         """Get list of words to find"""
         return self.placed_words.copy()
+    
+    def is_valid_selection(self, selected_cells):
+        """Check if the selected cells form a valid word"""
+        # Extract letters from selected cells
+        word = ''
+        for row, col in selected_cells:
+            if 0 <= row < self.size and 0 <= col < self.size:  # Ensure coordinates are within bounds
+                word += self.grid[row][col]
+            else:
+                return False  # Invalid selection if any cell is out of bounds
+
+        # Check if the word exists in the placed words
+        return word in self.placed_words
+    
+    def mark_word_incorrect(self, positions):
+        """Mark positions as incorrect with current timestamp"""
+        current_time = time.time()
+        for pos in positions:
+            self.incorrect_positions[pos] = current_time
+    
+    def is_position_incorrect(self, row, col):
+        """Check if a position is part of an incorrect selection and clear old ones"""
+        current_time = time.time()
+        pos = (row, col)
+        
+        # Clear old incorrect positions (older than 500ms)
+        positions_to_remove = []
+        for position, timestamp in self.incorrect_positions.items():
+            if current_time - timestamp > 0.5:  # 500ms = 0.5 seconds
+                positions_to_remove.append(position)
+        
+        # Remove old positions
+        for position in positions_to_remove:
+            del self.incorrect_positions[position]
+        
+        return pos in self.incorrect_positions

@@ -13,26 +13,27 @@ class UI:
         
         # Colors
         self.colors = {
-            'background': (240, 240, 240),
+            'background': (255,255,255),
             'grid_bg': (255, 255, 255),
-            'grid_border': (200, 200, 200),
-            'letter': (50, 50, 50),
-            'found_word': (144, 238, 144),
-            'selection': (173, 216, 230),
-            'button': (70, 130, 180),
+            'grid_border': (139, 125, 107, 255),
+            'letter': (139, 69, 19, 255),
+            'found_word': (205, 149, 12, 255),
+            'selection':  (255, 211, 155, 255),
+            'button': (139, 62, 47, 255),
             'button_hover': (100, 149, 237),
-            'text': (50, 50, 50),
-            'title': (25, 25, 112),
-            'score': (0, 100, 0)
+            'text': (139, 131, 120, 255),
+            'title': (139, 69, 19, 255),
+            'score': (0, 100, 0),
+            'incorrect': (255, 64, 64, 255)
         }
         
         # Fonts
         pygame.font.init()
         self.fonts = {
-            'title': pygame.font.Font(None, 48),
+            'title': pygame.font.Font('fonts/PressStart2P-Regular.ttf', 50), # Changed to use Fredoka font
             'large': pygame.font.Font(None, 36),
-            'medium': pygame.font.Font(None, 24),
-            'small': pygame.font.Font(None, 18)
+            'medium': pygame.font.Font('fonts/Fredoka-Regular.ttf', 24),
+            'small': pygame.font.Font(None, 24)
         }
         
         # Grid display settings
@@ -43,19 +44,19 @@ class UI:
         # Button settings
         self.button_width = 200
         self.button_height = 50
+
+        self.incorrect_selections = []  # Track incorrect selections with expiration times
     
     def draw_start_screen(self):
         """Draw the start screen"""
         # Title
-        title_text = self.fonts['title'].render("WORD SEARCH GAME", True, self.colors['title'])
+        title_text = self.fonts['title'].render("WORD SEARCH", True, self.colors['title'])
         title_rect = title_text.get_rect(center=(self.width // 2, 150))
         self.screen.blit(title_text, title_rect)
         
         # Instructions
         instructions = [
             "Find all hidden words in the grid!",
-            "Words can be horizontal, vertical, or diagonal",
-            "Click and drag to select words",
             "",
             "5 Levels of increasing difficulty",
             "Faster completion = Higher rank!"
@@ -69,7 +70,7 @@ class UI:
         # Start button
         start_button_rect = pygame.Rect(
             self.width // 2 - self.button_width // 2,
-            450,
+            400,
             self.button_width,
             self.button_height
         )
@@ -83,7 +84,7 @@ class UI:
         # Leaderboard button
         leaderboard_button_rect = pygame.Rect(
             self.width // 2 - self.button_width // 2,
-            520,
+            480,
             self.button_width,
             self.button_height
         )
@@ -94,10 +95,6 @@ class UI:
         leaderboard_text_rect = leaderboard_text.get_rect(center=leaderboard_button_rect.center)
         self.screen.blit(leaderboard_text, leaderboard_text_rect)
         
-        # Controls
-        controls_text = self.fonts['small'].render("Press SPACE to start or L for leaderboard", True, self.colors['text'])
-        controls_rect = controls_text.get_rect(center=(self.width // 2, 600))
-        self.screen.blit(controls_text, controls_rect)
     
     def draw_name_input(self, name):
         """Draw the name input screen"""
@@ -157,99 +154,87 @@ class UI:
         self.screen.blit(instruction_text, (20, self.height - 30))
     
     def _draw_grid(self, grid, selection_start, selection_end):
-        """Draw the word search grid"""
+        """Draw the word search grid without selection highlighting"""
         grid_size = grid.size
         total_grid_width = grid_size * self.cell_size
         total_grid_height = grid_size * self.cell_size
-        
+
         # Center the grid
         start_x = (self.width - total_grid_width) // 2
         start_y = 120
-        
+
         # Update grid position for mouse interaction
         self.grid_start_x = start_x
         self.grid_start_y = start_y
-        
-        # Draw selection highlight
+
+        # Get selected cells if there's a selection
+        selected_cells = []
         if selection_start and selection_end:
-            self._draw_selection_highlight(selection_start, selection_end, start_x, start_y)
-        
+            selected_cells = self._get_selected_cells(selection_start, selection_end)
+
         # Draw grid cells
         for row in range(grid_size):
             for col in range(grid_size):
                 x = start_x + col * self.cell_size
                 y = start_y + row * self.cell_size
-                
+
                 # Cell background
                 cell_rect = pygame.Rect(x, y, self.cell_size, self.cell_size)
-                
+
                 # Color based on state
                 if grid.is_position_found(row, col):
                     color = self.colors['found_word']
+                elif grid.is_position_incorrect(row, col):
+                    color = self.colors['incorrect']
+                elif (row, col) in selected_cells:
+                    color = self.colors['selection']
                 else:
                     color = self.colors['grid_bg']
-                
+
                 pygame.draw.rect(self.screen, color, cell_rect)
                 pygame.draw.rect(self.screen, self.colors['grid_border'], cell_rect, 1)
-                
+
                 # Letter
                 letter = grid.get_letter(row, col)
                 if letter:
                     letter_text = self.fonts['medium'].render(letter, True, self.colors['letter'])
                     letter_rect = letter_text.get_rect(center=cell_rect.center)
                     self.screen.blit(letter_text, letter_rect)
-    
-    def _draw_selection_highlight(self, start, end, grid_start_x, grid_start_y):
-        """Draw highlight for current selection"""
-        if not (start and end):
-            return
+
+    def _get_selected_cells(self, start_pos, end_pos):
+        """Calculate all cells between start and end positions for highlighting"""
+        start_row, start_col = start_pos
+        end_row, end_col = end_pos
         
-        # Calculate path
-        start_row, start_col = start
-        end_row, end_col = end
+        selected_cells = []
         
-        # Highlight selection path
-        positions = self._get_selection_positions(start, end)
-        for row, col in positions:
-            x = grid_start_x + col * self.cell_size
-            y = grid_start_y + row * self.cell_size
-            cell_rect = pygame.Rect(x, y, self.cell_size, self.cell_size)
-            
-            # Draw selection overlay
-            overlay = pygame.Surface((self.cell_size, self.cell_size))
-            overlay.set_alpha(100)
-            overlay.fill(self.colors['selection'])
-            self.screen.blit(overlay, (x, y))
-    
-    def _get_selection_positions(self, start, end):
-        """Get all positions in the selection path"""
-        positions = []
-        start_row, start_col = start
-        end_row, end_col = end
+        # Determine direction of selection
+        row_step = 1 if end_row >= start_row else -1
+        col_step = 1 if end_col >= start_col else -1
         
-        row_diff = end_row - start_row
-        col_diff = end_col - start_col
+        # Vertical selection
+        if start_col == end_col:
+            for row in range(start_row, end_row + row_step, row_step):
+                selected_cells.append((row, start_col))
         
-        # Calculate steps
-        steps = max(abs(row_diff), abs(col_diff))
+        # Horizontal selection
+        elif start_row == end_row:
+            for col in range(start_col, end_col + col_step, col_step):
+                selected_cells.append((start_row, col))
         
-        if steps == 0:
-            return [start]
+        # Diagonal selection (45 degrees only)
+        elif abs(end_row - start_row) == abs(end_col - start_col):
+            for i in range(abs(end_row - start_row) + 1):
+                row = start_row + i * row_step
+                col = start_col + i * col_step
+                selected_cells.append((row, col))
         
-        row_step = 0 if row_diff == 0 else (1 if row_diff > 0 else -1)
-        col_step = 0 if col_diff == 0 else (1 if col_diff > 0 else -1)
-        
-        for i in range(steps + 1):
-            row = start_row + i * row_step
-            col = start_col + i * col_step
-            positions.append((row, col))
-        
-        return positions
+        return selected_cells
     
     def _draw_word_list(self, word_list, found_words):
         """Draw the list of words to find"""
         # Position word list on the right side
-        start_x = self.width - 200
+        start_x = self.width - 260
         start_y = 120
         
         title_text = self.fonts['medium'].render("FIND THESE WORDS:", True, self.colors['title'])
@@ -395,7 +380,7 @@ class UI:
         if button_type == "start":
             button_rect = pygame.Rect(
                 self.width // 2 - self.button_width // 2,
-                450,
+                400, # Adjusted to match draw_start_screen
                 self.button_width,
                 self.button_height
             )
@@ -404,7 +389,7 @@ class UI:
         elif button_type == "leaderboard":
             button_rect = pygame.Rect(
                 self.width // 2 - self.button_width // 2,
-                520,
+                480, # Adjusted to match draw_start_screen
                 self.button_width,
                 self.button_height
             )
